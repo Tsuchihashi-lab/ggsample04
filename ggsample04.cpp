@@ -19,6 +19,77 @@
 // アニメーションの周期（秒）
 const double cycle(5.0);
 
+//軸(x, y, z)と回転角(a)から単位四元数(q)を求める
+void qmake(float* q, float x, float y, float z, float a)
+{
+  const float l(x * x + y * y + z * z);
+
+  if (l != 0.0f)
+  {
+    const float s(sin(a *= 0.5f) / sqrt(l));
+
+    q[0] = x * s;
+    q[1] = y * s;
+    q[2] = z * s;
+    q[3] = cos(a);
+  }
+}
+
+//単位四元数(q)から回転変換行列(m[])を求める
+void qrot(float *m, const float *q)
+{
+  float xx = q[0] * q[0] * 2.0f;
+  float yy = q[1] * q[1] * 2.0f;
+  float zz = q[2] * q[2] * 2.0f;
+  float xy = q[0] * q[1] * 2.0f;
+  float yz = q[1] * q[2] * 2.0f;
+  float zx = q[2] * q[0] * 2.0f;
+  float xw = q[0] * q[3] * 2.0f;
+  float yw = q[1] * q[3] * 2.0f;
+  float zw = q[2] * q[3] * 2.0f;
+
+  //回転行列　m[]
+  m[ 0] = 1.0f - yy - zz;
+  m[ 1] = xy + zw;
+  m[ 2] = zx - yw;
+  m[ 4] = xy - zw;
+  m[ 5] = 1.0f - zz - xx;
+  m[ 6] = yz + xw;
+  m[ 8] = zx + yw;
+  m[ 9] = yz - xw;
+  m[10] = 1.0f - xx - yy;
+  m[15] = 1.0f;
+  m[ 3] = m[ 7] = m[11] = m[12] = m[13] = m[14] = 0.0f;
+}
+
+//単位四元数(q)に球面線形補間を行う
+void slerp(float* p, const float* q, const float* r, const float t)
+{
+  const float qr(q[0] * r[0] + q[1] * r[1] + q[2] * r[2] + q[3] * r[3]);
+  const float ss(1.0f - qr * qr);
+
+  if (ss == 0.0)
+  {
+    p[0] = q[0];
+    p[1] = q[1];
+    p[2] = q[2];
+    p[3] = q[3];
+  }
+  else
+  {
+    const float sp(sqrt(ss));
+    const float ph(acos(qr));
+    const float pt(ph * t);
+    const float t1(sin(pt) / sp);
+    const float t0(sin(ph - pt) / sp);
+
+    p[0] = q[0] * t0 + r[0] * t1;
+    p[1] = q[1] * t0 + r[1] * t1;
+    p[2] = q[2] * t0 + r[2] * t1;
+    p[3] = q[3] * t0 + r[3] * t1;
+  }
+}
+
 //
 // アプリケーションの実行
 //
@@ -116,7 +187,24 @@ void app()
     // 時刻 t にもとづく回転アニメーション
     GLfloat mr[16];                   // 回転の変換行列
     // 【宿題】ここを解答してください（下の loadIdentity() を置き換えてください）
-    loadIdentity(mr);
+    float q[4];
+    float x = 1.0f;
+    float y = 0.0f;
+    float z = 0.0f;
+    float a = 1.0f;
+    qmake(q, x, y, z, a);
+
+    float r[4];
+    float rx = 0.0f;
+    float ry = 0.0f;
+    float rz = 1.0f;
+    float ra = 2.0f;
+    qmake(r, rx, ry, rz, ra);
+
+    float p[4];
+    slerp(p, q, r, t);
+
+    qrot(mr, p);
 
     // 時刻 t にもとづく平行移動アニメーション
     float location[3];                // 現在位置
